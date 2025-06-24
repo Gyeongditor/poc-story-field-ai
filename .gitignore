@@ -216,7 +216,7 @@ $RECYCLE.BIN/
 
 #AI hub Data
 .STT/poc_kospeech/test_data
-./whisper/test_data
+*.mp3
 #env
 *.env
 # End of https://www.toptal.com/developers/gitignore/api/python,windows,git
