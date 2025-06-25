@@ -2,10 +2,10 @@ import whisper
 import torch
 import time
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
+print(device)
 start_time = time.time()
 small_model = whisper.load_model('small',device=device)
-audio_path = f"D:/gap_year/poc-story-field-ai/STT/whisper/test_data/fairytale_test.mp3"
+audio_path = f"./fairytale_test.mp3"
 result = small_model.transcribe(audio_path)
 print(result['text'])
 
