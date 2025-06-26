@@ -6,7 +6,7 @@ print(device)
 start_time = time.time()
 small_model = whisper.load_model('small',device=device)
 audio_path = f"./fairytale_test.mp3"
-result = small_model.transcribe(audio_path)
+result = small_model.transcribe(audio_path,language="ko",fp16=False)
 print(result['text'])
 
 end_time = time.time()
