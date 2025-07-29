@@ -2,14 +2,16 @@ import os
 from dotenv import load_dotenv
 from stt_whisper import transcribe
 from gpt_casual2formal import casual_to_formal
-from gpt_story import generate_story
+from gpt_story import generate_story, save_story
 from dalle_image import generate_images
+import torch
 
 def main():
     load_dotenv()
     api_key = os.getenv('OPENAI_API_KEY')
     audio_path = 'C:/Users/chan/poc-story-field-ai/integration_test/travel_test.wav'
-    stt_text = transcribe(audio_path, device='cuda')  # GPU 사용시 'cuda'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    stt_text = transcribe(audio_path, device=device)  # GPU 사용시 'cuda'
     print('[STT 결과]', stt_text)
 
     casual_text = casual_to_formal(stt_text, api_key)
@@ -26,6 +28,7 @@ def main():
     story = generate_story(story_prompt, api_key)
     print('[동화 생성 결과]', story)
     print(f"[PAGE] 등장 횟수: {story.count('[PAGE]')}")
+    save_story(story, "story.txt")
 
     # [PAGE] 기준으로 분리
     story_pages = [s.strip() for s in story.split('[PAGE]') if s.strip()]

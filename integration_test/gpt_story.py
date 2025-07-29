@@ -9,3 +9,11 @@ def generate_story(prompt, api_key):
         messages=[{'role': 'user', 'content': prompt}]
     )
     return response.choices[0].message.content
+
+def save_story(story, filename, save_dir="./integration_test/result/gen_story"):
+    import os
+    os.makedirs(save_dir, exist_ok=True)
+    file_path = os.path.join(save_dir, filename)
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(story)
+    print(f"스토리가 저장되었습니다: {file_path}")

@@ -2,7 +2,7 @@ import openai
 import os
 import requests
 
-def generate_images(prompts, api_key, save_dir='./gen_img', model='dall-e-3'):
+def generate_images(prompts, api_key, save_dir='./integration_test/result/gen_img', model='dall-e-3'):
     os.makedirs(save_dir, exist_ok=True)
     client = openai.OpenAI(api_key=api_key)
     image_paths = []

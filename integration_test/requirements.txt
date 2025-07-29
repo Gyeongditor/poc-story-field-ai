@@ -1,0 +1,6 @@
+openai
+requests
+python-dotenv
+openai-whisper
+torch
+torchaudio 
