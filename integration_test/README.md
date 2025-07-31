@@ -19,9 +19,9 @@
 
 ## 실행 방법
 1. `.env` 파일에 OpenAI API 키 입력 (OPENAI_API_KEY=sk-...)
-2. 필요한 패키지 설치 (requirements.txt 참고)
-3. main.py 실행
+2. docker를 활용해서 실행
+``` docker run --env-file [.env 경로로] -v "[integartion_test 폴더 경로]" gyeongditor/storyfield-ai:latest ```
 
 ## 결과물
-- 생성된 동화: main.py 출력
-- 생성된 이미지: gen_img/page_1.png, page_2.png, ...
+- 생성된 동화: result/gen_story/story.txt
+- 생성된 이미지: result/gen_img/page_1.png, page_2.png, ...
