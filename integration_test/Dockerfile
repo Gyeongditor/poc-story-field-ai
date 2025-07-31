@@ -36,5 +36,5 @@ COPY . .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # 실행 커맨드 (main.py 기준)
-CMD ["python", "main.py"]
-
+CMD ["python", "main_docker.py"]
+#CMD ["python", "main.py"]
