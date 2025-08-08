@@ -36,7 +36,7 @@ def main():
 
     image_prompts = [
         f"동화의 한 장면을 삽화 스타일로 그려줘. 그림에는 글자나 텍스트가 들어가지 않게 해줘. "
-        f"밝고 따뜻한 색감의 일러스트, 통일된 동화책 스타일, {page[:100]}"
+        f"밝고 따뜻한 색감의 일러스트, 통일된 동화책 스타일, 그림들이 통일된 화풍을 가졌으면 좋겠어., {page[:100]}"
         for page in story_pages
     ]
     image_paths = generate_images(image_prompts, api_key)
