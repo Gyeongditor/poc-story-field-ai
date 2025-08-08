@@ -1,4 +1,4 @@
-torch
-transformers
-diffusers[torch]
-accelerate
+transformers==4.42.*
+diffusers[torch]==0.29.*
+accelerate==0.31.*
+safetensors

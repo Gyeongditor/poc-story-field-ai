@@ -9,8 +9,11 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install --index-url https://download.pytorch.org/whl/cu121 torch torchvision torchaudio && \
+    pip install -r requirements.txt
 
 COPY storybook_poc.py .
+COPY transcript.txt .
 
 CMD ["python3", "storybook_poc.py"]
