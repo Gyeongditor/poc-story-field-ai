@@ -1,4 +1,8 @@
-transformers==4.42.*
-diffusers[torch]==0.29.*
-accelerate==0.31.*
-safetensors
+# requirements.txt
+diffusers==0.31.0
+transformers==4.44.2
+accelerate==0.33.0
+safetensors==0.4.4
+sentencepiece==0.2.1
+protobuf==6.31.1
+# torch는 베이스 이미지의 CUDA 빌드를 사용하므로 여기서 설치하지 않습니다.

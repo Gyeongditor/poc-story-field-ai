@@ -5,7 +5,8 @@ from datetime import datetime
 from typing import Dict, Any, List
 
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-from diffusers import StableDiffusionPipeline
+#from diffusers import StableDiffusionPipeline
+from diffusers import AutoPipelineForText2Image
 import torch
 
 
@@ -99,13 +100,26 @@ def generate_book_from_transcript(transcript: str) -> Dict[str, Any]:
     return book
 
 
+# def build_image_pipeline():
+#     pipe = StableDiffusionPipeline.from_pretrained(
+#         "stabilityai/stable-diffusion-3.5-medium",
+#         torch_dtype=torch.float16,
+#     ).to("cuda")
+#     try:
+#         pipe.enable_attention_slicing()
+#     except Exception:
+#         pass
+#     return pipe
+
 def build_image_pipeline():
-    pipe = StableDiffusionPipeline.from_pretrained(
-        "stabilityai/stable-diffusion-1-5",
-        torch_dtype=torch.float16,
+    model_id = "stabilityai/stable-diffusion-3.5-medium"
+    pipe = AutoPipelineForText2Image.from_pretrained(
+        model_id, torch_dtype=torch.float16
     ).to("cuda")
+    # 메모리 최적화(옵션)
     try:
-        pipe.enable_attention_slicing()
+        pipe.enable_vae_slicing()
+        pipe.enable_vae_tiling()
     except Exception:
         pass
     return pipe
@@ -158,9 +172,11 @@ def save_book_outputs(book: Dict[str, Any], output_root: str = "outputs/storyboo
 if __name__ == "__main__":
     print("📥 transcript.txt 불러오는 중...")
     transcript = read_transcript("transcript.txt")
+    print(transcript) # 디버깅 용
 
     print("📖 동화 생성 중...")
     book = generate_book_from_transcript(transcript)
+    print(book) # 디버깅 용
 
     print("🖼️ 표지 및 삽화 생성/저장 중...")
     out_dir = save_book_outputs(book)
