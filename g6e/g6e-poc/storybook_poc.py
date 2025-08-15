@@ -2,15 +2,15 @@ import os
 import re
 import json
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-#from diffusers import StableDiffusionPipeline
 from diffusers import AutoPipelineForText2Image
 import torch
 
 
 def read_transcript(transcript_path: str = "transcript.txt") -> str:
+    """transcript.txt 읽기"""
     if not os.path.exists(transcript_path):
         return ""
     with open(transcript_path, "r", encoding="utf-8") as f:
@@ -19,22 +19,27 @@ def read_transcript(transcript_path: str = "transcript.txt") -> str:
 
 
 def build_text_generator():
-    model_id = "tiiuae/falcon-7b-instruct"
-    tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+    """LLaMA 3 8B Instruct 기반 텍스트 생성기 빌드"""
+    model_id = "meta-llama/Meta-Llama-3-8B-Instruct"
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
-        torch_dtype=torch.bfloat16,
-        device_map="auto",
-        trust_remote_code=True,
+        torch_dtype=torch.float16,
+        device_map="auto"
     )
-    return pipeline("text-generation", model=model, tokenizer=tokenizer)
+    return pipeline(
+        "text-generation",
+        model=model,
+        tokenizer=tokenizer
+    )
 
 
 def parse_json_safely(text: str) -> Dict[str, Any]:
+    """모델 출력에서 JSON 부분만 안전하게 추출"""
     start = text.find("{")
     end = text.rfind("}")
     if start != -1 and end != -1 and end > start:
-        snippet = text[start : end + 1]
+        snippet = text[start:end + 1]
         try:
             return json.loads(snippet)
         except Exception:
@@ -43,6 +48,7 @@ def parse_json_safely(text: str) -> Dict[str, Any]:
 
 
 def generate_book_from_transcript(transcript: str) -> Dict[str, Any]:
+    """transcript 기반으로 동화 생성"""
     generator = build_text_generator()
 
     system_instruction = (
@@ -74,11 +80,10 @@ def generate_book_from_transcript(transcript: str) -> Dict[str, Any]:
 
     output = generator(
         prompt,
-        max_new_tokens=1024,
+        max_new_tokens=2048,  # 8K context 지원, 충분히 여유
         do_sample=True,
         temperature=0.8,
-        top_p=0.95,
-        eos_token_id=None,
+        top_p=0.95
     )[0]["generated_text"]
 
     book = parse_json_safely(output)
@@ -93,30 +98,23 @@ def generate_book_from_transcript(transcript: str) -> Dict[str, Any]:
             "title": "마법의 숲에서",
             "cover_prompt": "A whimsical, colorful storybook cover of a magical forest, soft lighting, painterly style",
             "pages": [
-                {"page": i + 1, "text": "작은 토끼가 숲에서 모험을 시작해요.", "illustration_prompt": "Cute rabbit in a magical forest, soft light, Studio Ghibli style"}
+                {
+                    "page": i + 1,
+                    "text": "작은 토끼가 숲에서 모험을 시작해요.",
+                    "illustration_prompt": "Cute rabbit in a magical forest, soft light, Studio Ghibli style"
+                }
                 for i in range(5)
             ],
         }
     return book
 
 
-# def build_image_pipeline():
-#     pipe = StableDiffusionPipeline.from_pretrained(
-#         "stabilityai/stable-diffusion-3.5-medium",
-#         torch_dtype=torch.float16,
-#     ).to("cuda")
-#     try:
-#         pipe.enable_attention_slicing()
-#     except Exception:
-#         pass
-#     return pipe
-
 def build_image_pipeline():
+    """Stable Diffusion 이미지 생성 파이프라인"""
     model_id = "stabilityai/stable-diffusion-3.5-medium"
     pipe = AutoPipelineForText2Image.from_pretrained(
         model_id, torch_dtype=torch.float16
     ).to("cuda")
-    # 메모리 최적화(옵션)
     try:
         pipe.enable_vae_slicing()
         pipe.enable_vae_tiling()
@@ -126,12 +124,14 @@ def build_image_pipeline():
 
 
 def safe_filename(name: str) -> str:
+    """파일명 안전하게 변환"""
     name = re.sub(r"[\\/:*?\"<>|]", " ", name).strip()
     name = re.sub(r"\s+", "_", name)
     return name[:60] if len(name) > 60 else name
 
 
 def save_book_outputs(book: Dict[str, Any], output_root: str = "outputs/storybook") -> str:
+    """동화 텍스트와 이미지 저장"""
     os.makedirs(output_root, exist_ok=True)
     title = book.get("title", "storybook")
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -143,7 +143,7 @@ def save_book_outputs(book: Dict[str, Any], output_root: str = "outputs/storyboo
     with open(text_path, "w", encoding="utf-8") as f:
         f.write(f"제목: {title}\n\n")
         for page in book.get("pages", []):
-            f.write(f"[Page {page.get('page')}]\n{page.get('text','')}\n\n")
+            f.write(f"[Page {page.get('page')}]\n{page.get('text', '')}\n\n")
 
     # 이미지 생성 및 저장
     pipe = build_image_pipeline()
@@ -162,7 +162,6 @@ def save_book_outputs(book: Dict[str, Any], output_root: str = "outputs/storyboo
         img_path = os.path.join(folder, f"page_{page_num}.png")
         img.save(img_path)
 
-    # 리소스 정리
     del pipe
     torch.cuda.empty_cache()
 
@@ -172,11 +171,11 @@ def save_book_outputs(book: Dict[str, Any], output_root: str = "outputs/storyboo
 if __name__ == "__main__":
     print("📥 transcript.txt 불러오는 중...")
     transcript = read_transcript("transcript.txt")
-    print(transcript) # 디버깅 용
+    print(transcript[:500] + ("..." if len(transcript) > 500 else ""))  # 미리보기
 
     print("📖 동화 생성 중...")
     book = generate_book_from_transcript(transcript)
-    print(book) # 디버깅 용
+    print(book)  # 디버깅용
 
     print("🖼️ 표지 및 삽화 생성/저장 중...")
     out_dir = save_book_outputs(book)

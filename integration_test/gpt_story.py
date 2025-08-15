@@ -10,7 +10,7 @@ def generate_story(prompt, api_key):
     )
     return response.choices[0].message.content
 
-def save_story(story, filename, save_dir="./integration_test/result/gen_story"):
+def save_story(story, filename, save_dir="./result/gen_story"):
     import os
     os.makedirs(save_dir, exist_ok=True)
     file_path = os.path.join(save_dir, filename)

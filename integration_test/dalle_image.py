@@ -2,7 +2,7 @@ import openai
 import os
 import requests
 
-def generate_images(prompts, api_key, save_dir='./integration_test/result/gen_img', model='dall-e-3'):
+def generate_images(prompts, api_key, save_dir='./result/gen_img', model='dall-e-3'):
     os.makedirs(save_dir, exist_ok=True)
     client = openai.OpenAI(api_key=api_key)
     image_paths = []
@@ -22,7 +22,21 @@ def generate_images(prompts, api_key, save_dir='./integration_test/result/gen_im
         print(f'[{idx}] 이미지 저장 완료:', save_path)
     return image_paths
 
-# 예시 사용법 (main.py에서 호출)
-# prompts = ["프롬프트1", "프롬프트2", ...]
-# api_key = ...
-# generate_images(prompts, api_key) 
+def generate_title_image(prompt, api_key, save_dir='./result', model='dall-e-3'):
+    import requests
+    import os
+    os.makedirs(save_dir, exist_ok=True)
+    client = openai.OpenAI(api_key=api_key)
+    response = client.images.generate(
+        model=model,
+        prompt=prompt,
+        n=1,
+        size="1024x1024"
+    )
+    image_url = response.data[0].url
+    img_data = requests.get(image_url).content
+    save_path = os.path.join(save_dir, 'title.png')
+    with open(save_path, 'wb') as handler:
+        handler.write(img_data)
+    print(f'title.png 표지 이미지 저장 완료: {save_path}')
+    return save_path
