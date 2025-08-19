@@ -21,14 +21,22 @@
    - 또는 터미널에서 직접 설정
 
 3. 서버 실행
-   ```bash
-   uvicorn main:app --reload
-   ```
+   - **텍스트 입력 기반 동화 생성**
+     ```bash
+     uvicorn main:app --reload
+     ```
+   - **오디오(STT) 기반 동화 생성**
+     ```bash
+     uvicorn main_whisper:app --reload
+     ```
 
 4. 테스트
    - Swagger: [http://localhost:8000/docs](http://localhost:8000/docs)
+   - Postman, Python 등으로 multipart/form-data 응답 확인
 
-## 입력 예시(JSON)
+## 입력 예시
+
+### main.py (텍스트 입력)
 ```json
 {
   "character": "굳건이",
@@ -41,6 +49,22 @@
   }
 }
 ```
+
+### main_whisper.py (오디오 입력)
+- **form-data**로 전송
+  - key: data, value: (아래 JSON을 string으로 입력, type: Text)
+    ```json
+    {
+      "character": "굳건이",
+      "age": 26,
+      "sex": "남자",
+      "keyword": {
+        "atmosphere": "따뜻한",
+        "drawingStyle": "수채화"
+      }
+    }
+    ```
+  - key: audio, value: (wav/mp3 파일 업로드, type: File)
 
 ## 출력 예시
 - story.txt: 각 페이지별 동화 내용 (예: 1페이지:내용)
@@ -61,3 +85,4 @@
 - DALL-E 프롬프트에 민감한 금지어(언어/인종/국적 등)는 사용하지 않음
 - story.txt는 안내문/코드/마크다운/빈 줄 없이 실제 동화 본문만 저장
 - 여러 번 실행 시 result/ 폴더에 타임스탬프별로 결과가 쌓임
+- main_whisper.py는 오디오(STT) 기반 동화 생성 전용 엔드포인트임
