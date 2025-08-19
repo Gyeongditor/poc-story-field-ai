@@ -222,3 +222,7 @@ STORY/StoryLine/data
 #env
 *.env
 # End of https://www.toptal.com/developers/gitignore/api/python,windows,git
+fine_tunnning/data
+
+# result data
+fastapi/result
