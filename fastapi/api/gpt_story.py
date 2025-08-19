@@ -7,6 +7,7 @@ def make_story(story_info: dict) -> list:
     story_info(dict)로부터 동화 페이지별 내용을 생성
     - storyContent의 실제 내용을 동화에 반드시 반영하도록 프롬프트에 명시
     - 5~8페이지, 'N페이지:내용' 한 줄 형식으로만 응답하도록 강하게 요구
+    - 각 페이지는 3~6문장, 200~400자 분량, 풍부한 묘사/대화/감정/동화적 분위기/상상력/배경/생각/느낌 포함
     """
     api_key = os.environ.get('OPENAI_API_KEY')
     if not api_key:
@@ -27,26 +28,29 @@ def make_story(story_info: dict) -> list:
     # 프롬프트 조합
     if len(pages) == 1:
         prompt = (
-            "아래 정보를 바탕으로 동화책을 5~8페이지로 나눠서 각 페이지별로 2~3문장씩 동화체로 써줘. "
+            "아래 정보를 바탕으로 동화책을 5~8페이지로 나눠서 각 페이지별로 3~6문장, 200~400자 분량으로 써줘. "
+            "각 페이지는 구체적인 상황 묘사, 대화, 감정, 동화적 분위기, 상상력, 배경 설명, 캐릭터의 생각과 느낌까지 풍부하게 써. "
+            "짧고 단순하게 쓰지 말고, 진짜 동화책 한 페이지처럼 써줘. "
             "!!! 반드시 아래 형식으로만 응답해줘. 안내문, 코드, 리스트, 마크다운, 설명, 인삿말, 기타 부가 텍스트는 절대 넣지 마. "
             "형식 예시: \n"
-            "1페이지:병아리는 숲을 산책했어요.\n"
-            "2페이지:병아리는 친구를 만났어요.\n"
-            "3페이지:병아리는 집에 돌아왔어요.\n"
+            "1페이지:옛날 옛적, 작은 마을에 늘 여행을 꿈꾸던 소녀 하나가 살고 있었어요. 그녀는 하늘 높이 떠다니는 구름을 보며 그곳에 가보고 싶었고, 푸른 바다를 바라보며 물속의 신비한 생물들을 만져보고 싶다는 소망을 품었답니다. 그러나 마을 사람들이 언제나 그녀에게 “여행은 위험해!”라고 말하며 꿈을 꺾곤 했어요.\n"
+            "2페이지: ...\n"
             "이런 식으로, 각 페이지는 'N페이지:내용' 한 줄로만, 총 5~8줄로만 응답해. "
             f"- 등장인물: {character} ({age}세, {sex})\n"
             f"- 키워드: {keyword}\n"
             f"- storyContent: {pages[0]}\n"
-            f"{must_use_content_kr}\n{must_use_content_en}"
+            f"{must_use_content_kr}\n{must_use_content_en}\n"
+            "Each page should be 3~6 sentences, 200~400 characters, with rich description, dialogue, emotions, fairy-tale atmosphere, imagination, background, and the character's thoughts and feelings. Do not write short or simple sentences."
         )
     else:
         prompt = (
             "아래 정보를 바탕으로 동화책의 각 페이지 내용을 만들어줘.\n"
+            "각 페이지는 3~6문장, 200~400자 분량, 구체적인 상황 묘사, 대화, 감정, 동화적 분위기, 상상력, 배경 설명, 캐릭터의 생각과 느낌까지 풍부하게 써. "
+            "짧고 단순하게 쓰지 말고, 진짜 동화책 한 페이지처럼 써줘. "
             "!!! 반드시 아래 형식으로만 응답해줘. 안내문, 코드, 리스트, 마크다운, 설명, 인삿말, 기타 부가 텍스트는 절대 넣지 마. "
             "형식 예시: \n"
-            "1페이지:병아리는 숲을 산책했어요.\n"
-            "2페이지:병아리는 친구를 만났어요.\n"
-            "3페이지:병아리는 집에 돌아왔어요.\n"
+            "1페이지:옛날 옛적, 작은 마을에 늘 여행을 꿈꾸던 소녀 하나가 살고 있었어요. 그녀는 하늘 높이 떠다니는 구름을 보며 그곳에 가보고 싶었고, 푸른 바다를 바라보며 물속의 신비한 생물들을 만져보고 싶다는 소망을 품었답니다. 그러나 마을 사람들이 언제나 그녀에게 “여행은 위험해!”라고 말하며 꿈을 꺾곤 했어요.\n"
+            "2페이지: ...\n"
             "이런 식으로, 각 페이지는 'N페이지:내용' 한 줄로만, 총 5~8줄로만 응답해. "
             f"- 등장인물: {character} ({age}세, {sex})\n"
             f"- 키워드: {keyword}\n"
@@ -54,7 +58,10 @@ def make_story(story_info: dict) -> list:
         )
         for idx, page in enumerate(pages, 1):
             prompt += f"{idx}페이지:{page}\n"
-        prompt += f"{must_use_content_kr}\n{must_use_content_en}"
+        prompt += (
+            f"{must_use_content_kr}\n{must_use_content_en}\n"
+            "Each page should be 3~6 sentences, 200~400 characters, with rich description, dialogue, emotions, fairy-tale atmosphere, imagination, background, and the character's thoughts and feelings. Do not write short or simple sentences."
+        )
     # OpenAI API 호출
     response = client.chat.completions.create(
         model='gpt-4o-mini',

@@ -9,9 +9,9 @@ import json
 import os
 from datetime import datetime
 import zipfile
-from api.gpt_casual2formal import casual2formal
-from api.gpt_story import make_story, make_title
-from api.dalle_image import make_image, make_thumbnail
+from api.gpt_casual2formal import casual2formal #만든 api 구어체 변환
+from api.gpt_story import make_story, make_title # 만든 api 동화 생성
+from api.dalle_image import make_image, make_thumbnail # 만든 api 이미지 생성(썸네일, 페이지별 이미지)
 
 # .env 파일 자동 로드 (OPENAI_API_KEY 등 환경변수 사용 가능)
 load_dotenv()
@@ -31,7 +31,7 @@ class StoryRequest(BaseModel):
     storyContent: str  # 동화 원본 내용(긴 문장 또는 페이지 구분 없이)
     keyword: Optional[Keyword] = None  # (선택) 분위기, 그림체 등
 
-def split_story_by_page(story: str) -> list:
+def split_story_by_page(story: str) -> list: # 페이지 구분 함수
     """입력 storyContent에서 'N페이지:' 구분이 있을 경우 페이지별로 분리"""
     pattern = r"(?:\n|\r|\r\n)?\s*\d+페이지\s*:"
     splits = re.split(pattern, story)
@@ -39,7 +39,7 @@ def split_story_by_page(story: str) -> list:
     pages = [s.strip() for s in splits[1:]]
     return pages
 
-def make_story_list(story_result: list) -> list:
+def make_story_list(story_result: list) -> list: # 동화 생성 결과를 페이지별로 리스트로 변환
     """story_result를 [{pageNumber, content, filename}, ...] 리스트로 변환"""
     return [
         {
@@ -57,11 +57,11 @@ async def process(request: StoryRequest):
     - 입력값: character, age, sex, storyContent, keyword
     - 결과: story.json, title.png, page_1.png, ... (zip 파일로 반환)
     """
-    data = request.dict()
+    data = request.dict() # 입력값을 dict로 변환
     # 1. storyContent를 문어체로 변환
-    formal_story = casual2formal(data["storyContent"])
+    formal_story = casual2formal(data["storyContent"]) # 입력값의 storyContent를 문어체로 변환
     # 2. 페이지 구분(없으면 한 페이지로)
-    pages = split_story_by_page(formal_story)
+    pages = split_story_by_page(formal_story) # 페이지 구분
 
     # 3. 동화 생성 정보 구성
     story_info = {
@@ -72,11 +72,11 @@ async def process(request: StoryRequest):
         "keyword": data.get("keyword", {})
     }
     # 4. 동화 생성 (페이지별 내용)
-    story_result = make_story(story_info)
+    story_result = make_story(story_info) # 동화 생성
     # 5. 동화 제목 생성
-    title = make_title(story_result)
+    title = make_title(story_result) # 동화 제목 생성
 
-    # 6. 결과 저장 폴더 생성 (타임스탬프 기반)
+    # 6. 결과 저장 폴더 생성 (타임스탬프 기반)(차후 uuid나 다른 방식으로 변경해야 함)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = os.path.join("result", timestamp)
     os.makedirs(output_dir, exist_ok=True)

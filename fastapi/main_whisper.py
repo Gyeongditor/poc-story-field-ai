@@ -42,7 +42,7 @@ async def process(
 
     # 3. whisper로 STT 변환
     stt_text = transcribe_audio(audio_path, model_size="medium")
-
+    print(f'stt_text: {stt_text}') #디버깅 용
     # 4. 임시 파일 삭제
     os.remove(audio_path)
 
@@ -57,7 +57,7 @@ async def process(
 
     # 6. storyContent를 문어체로 변환
     formal_story = casual2formal(data["storyContent"])
-
+    print(f'formal_story: {formal_story}') #디버깅 용
     # 7. 페이지 구분(없으면 한 페이지로)
     def split_story_by_page(story: str) -> list:
         pattern = r"(?:\n|\r|\r\n)?\s*\d+페이지\s*:"
