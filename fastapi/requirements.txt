@@ -7,3 +7,7 @@ requests-toolbelt>=1.0.0
 aiohttp>=3.9.0
 python-dotenv>=1.0.1
 python-multipart>=0.0.10
+openai-whisper>=20231117
+numba>=0.58.0
+numpy<2.0.0
+tqdm>=4.66.0

@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  fastapi:
+    image: gyeongditor/storyfield-fastapi:latest
+    container_name: fastapi_app
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    volumes:
+      - ./.env:/app/.env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
