@@ -37,7 +37,7 @@ python STT/GCP_STT/main.py --bucket <YOUR_BUCKET> --create-bucket --region ASIA-
 ### 4) 실행 예시
 - 로컬 파일 업로드 후 전사:
 ```
-python STT/GCP_STT/main.py --file STT/GCP_STT/travel_test.wav --bucket <YOUR_BUCKET> \
+python STT/GCP_STT/main.py travel_test.wav --bucket <YOUR_BUCKET> \
   --prefix stt --lang ko-KR --credentials C:\path\to\service-account.json
 ```
 

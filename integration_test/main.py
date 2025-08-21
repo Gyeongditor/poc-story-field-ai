@@ -9,7 +9,7 @@ import torch
 def main():
     load_dotenv()
     api_key = os.getenv('OPENAI_API_KEY')
-    audio_path = 'C:/Users/chan/poc-story-field-ai/integration_test/travel_test.wav'
+    audio_path = 'C:/Users/chan/poc-story-field-ai/travel_test.wav'
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     stt_text = transcribe(audio_path, device=device)  # GPU 사용시 'cuda'
     print('[STT 결과]', stt_text)

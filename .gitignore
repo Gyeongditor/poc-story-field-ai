@@ -215,7 +215,8 @@ $RECYCLE.BIN/
 *.lnk
 
 #AI hub Data
-.STT/poc_kospeech/test_data
+STT/poc_kospeech/test_data
+STT/whisper/test_data
 *.mp3
 STORY/AI_HUB
 STORY/StoryLine/data
