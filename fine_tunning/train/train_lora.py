@@ -43,7 +43,7 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 from transformers import DataCollatorForLanguageModeling
-from trl import SFTTrainer
+from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
 from peft import LoraConfig, TaskType
 
 
@@ -256,13 +256,12 @@ def main() -> None:
         dataloader_num_workers=2,
     )
 
-    # Build formatting function and data collator for label masking
+    # Build formatting function and data collator for completion-only loss on response
     formatting_func = build_formatting_func(args.response_template)
-
-    # When using TRL SFTTrainer with text formatting, we can either use
-    # DataCollatorForLanguageModeling (train_on_prompt=True/False) or
-    # Completion-only collator. Here we rely on SFTTrainer's internal masking via
-    # response_template parameter.
+    data_collator = DataCollatorForCompletionOnlyLM(
+        tokenizer=tokenizer,
+        response_template=args.response_template,
+    )
 
     trainer = SFTTrainer(
         model=model,
@@ -274,8 +273,7 @@ def main() -> None:
         max_seq_length=args.max_seq_len,
         packing=False,
         dataset_num_proc=2,
-        response_template=args.response_template,
-        train_on_prompt=False,
+        data_collator=data_collator,
     )
 
     last_ckpt = None
