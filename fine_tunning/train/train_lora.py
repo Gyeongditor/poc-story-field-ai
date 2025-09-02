@@ -136,7 +136,7 @@ def parse_args() -> ScriptArgs:
     parser.add_argument(
         "--response_template",
         type=str,
-        default="### 응답:",
+        default="### 응답:\n",
         help="Prefix string that marks the start of the response segment.",
     )
 
@@ -195,7 +195,32 @@ def main() -> None:
         "train": os.path.join(args.data_dir, args.train_file),
         "validation": os.path.join(args.data_dir, args.eval_file),
     }
-    dataset = load_dataset("json", data_files=data_files)
+    raw_ds = load_dataset("json", data_files=data_files)
+
+    # Preprocess to single 'text' field so SFTTrainer knows exact lengths and steps
+    def _to_text(batch):
+        instructions = batch.get("instruction")
+        inputs = batch.get("input")
+        outputs = batch.get("output")
+        texts = []
+        for inst, inp, out in zip(instructions, inputs, outputs):
+            inst = inst or ""
+            inp = inp or ""
+            out = out or ""
+            txt = (
+                f"### 지시사항:\n{inst}\n\n"
+                f"### 입력:\n{inp}\n\n"
+                f"{args.response_template}{out}"
+            )
+            texts.append(txt)
+        return {"text": texts}
+
+    dataset = raw_ds.map(
+        _to_text,
+        batched=True,
+        remove_columns=raw_ds["train"].column_names,
+        desc="Formatting dataset to 'text' field",
+    )
 
     # Tokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=True)
@@ -256,8 +281,7 @@ def main() -> None:
         dataloader_num_workers=2,
     )
 
-    # Build formatting function and data collator for completion-only loss on response
-    formatting_func = build_formatting_func(args.response_template)
+    # Build data collator for completion-only loss on response
     data_collator = DataCollatorForCompletionOnlyLM(
         tokenizer=tokenizer,
         response_template=args.response_template,
@@ -269,7 +293,7 @@ def main() -> None:
         args=training_args,
         train_dataset=dataset["train"],
         eval_dataset=dataset.get("validation"),
-        formatting_func=formatting_func,
+        dataset_text_field="text",
         max_seq_length=args.max_seq_len,
         packing=False,
         dataset_num_proc=2,

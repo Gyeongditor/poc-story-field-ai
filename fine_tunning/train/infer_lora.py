@@ -72,8 +72,14 @@ def generate(
             pad_token_id=tokenizer.eos_token_id,
         )
     output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-    # Strip the prompt
-    return output_text.split("### 응답:")[-1].strip()
+    # Keep only completion after the response header
+    if "### 응답:\n" in output_text:
+        completion = output_text.split("### 응답:\n", 1)[1]
+    elif "### 응답:" in output_text:
+        completion = output_text.split("### 응답:", 1)[1]
+    else:
+        completion = output_text
+    return completion.strip()
 
 
 def main():
@@ -95,6 +101,7 @@ def main():
     parser.add_argument("--page", type=int, default=1)
     parser.add_argument("--sentences", type=int, default=3)
     parser.add_argument("--words", type=int, default=40)
+
     parser.add_argument("--max_new_tokens", type=int, default=512)
     parser.add_argument("--temperature", type=float, default=0.7)
     parser.add_argument("--top_p", type=float, default=0.9)
