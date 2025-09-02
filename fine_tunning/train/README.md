@@ -104,6 +104,31 @@ python train_lora.py \
 - `per_device_train_batch_size=1`, `grad_accum=16~32`, `bf16=true`, `4bit=true`
 - 컨텍스트 길이가 길면 `max_seq_len`을 1536/1024로 줄이세요.
 
+### 3-1) 포그라운드 실행 (터미널에서 바로 보기)
+
+```bash
+python train_lora.py \
+  --model_name_or_path beomi/llama-2-ko-7b \
+  --data_dir ./story \
+  --train_file hf_instruction_train.jsonl \
+  --eval_file hf_instruction_val.jsonl \
+  --output_dir ./lora-out \
+  --max_seq_len 2048 \
+  --per_device_train_batch_size 1 \
+  --per_device_eval_batch_size 1 \
+  --gradient_accumulation_steps 16 \
+  --num_train_epochs 2 \
+  --learning_rate 1e-4 \
+  --lora_r 16 --lora_alpha 32 --lora_dropout 0.05 \
+  --quantize_4bit true --bf16 false --fp16 true --use_gradient_checkpointing true
+```
+
+- 출력 로그가 터미널에 실시간 표시됩니다. 다른 창에서 GPU 사용률 확인:
+```bash
+watch -n 1 nvidia-smi
+```
+- 중단 후 재개: 동일한 `--output_dir`로 다시 실행하면 자동으로 이어서 학습합니다.
+
 ### 4) 추론 (LoRA 어댑터 로드)
 
 ```bash
