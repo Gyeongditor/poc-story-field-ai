@@ -56,8 +56,11 @@ def generate(
     instruction: str,
     user_input: str,
     max_new_tokens: int = 512,
+    min_new_tokens: int = 0,
     temperature: float = 0.7,
     top_p: float = 0.9,
+    repetition_penalty: float = 1.0,
+    no_repeat_ngram_size: int = 0,
     do_sample: bool = True,
 ) -> str:
     prompt = build_prompt(instruction, user_input)
@@ -66,8 +69,11 @@ def generate(
         output_ids = model.generate(
             **inputs,
             max_new_tokens=max_new_tokens,
+            min_new_tokens=min_new_tokens,
             temperature=temperature,
             top_p=top_p,
+            repetition_penalty=repetition_penalty,
+            no_repeat_ngram_size=no_repeat_ngram_size,
             do_sample=do_sample,
             pad_token_id=tokenizer.eos_token_id,
         )
@@ -103,11 +109,15 @@ def main():
     parser.add_argument("--words", type=int, default=40)
 
     parser.add_argument("--max_new_tokens", type=int, default=512)
+    parser.add_argument("--min_new_tokens", type=int, default=50)
     parser.add_argument("--temperature", type=float, default=0.7)
     parser.add_argument("--top_p", type=float, default=0.9)
+    parser.add_argument("--repetition_penalty", type=float, default=1.05)
+    parser.add_argument("--no_repeat_ngram_size", type=int, default=3)
     parser.add_argument("--no_sample", action="store_true")
     parser.add_argument("--bf16", type=lambda s: s.lower() in {"1", "true", "yes"}, default=True)
     parser.add_argument("--quantize_4bit", type=lambda s: s.lower() in {"1", "true", "yes"}, default=True)
+    parser.add_argument("--output_path", type=str, default=None, help="생성 결과를 저장할 파일 경로(.txt)")
     args = parser.parse_args()
 
     # 필요 시 구조화 입력으로 user_input 생성
@@ -158,11 +168,23 @@ def main():
         instruction=args.instruction,
         user_input=args.user_input,
         max_new_tokens=args.max_new_tokens,
+        min_new_tokens=args.min_new_tokens,
         temperature=args.temperature,
         top_p=args.top_p,
+        repetition_penalty=args.repetition_penalty,
+        no_repeat_ngram_size=args.no_repeat_ngram_size,
         do_sample=not args.no_sample,
     )
+    # 출력
     print(text)
+    # 파일 저장 옵션
+    if args.output_path:
+        out_dir = os.path.dirname(args.output_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+        with open(args.output_path, "w", encoding="utf-8") as f:
+            f.write(text)
+        print(f"[SAVED] {args.output_path}")
 
 
 if __name__ == "__main__":
