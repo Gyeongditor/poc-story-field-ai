@@ -39,6 +39,7 @@ from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
     TrainingArguments,
+    BitsAndBytesConfig,
 )
 from transformers.trainer_utils import get_last_checkpoint
 from transformers import DataCollatorForLanguageModeling
@@ -177,6 +178,18 @@ def main() -> None:
 
     os.makedirs(args.output_dir, exist_ok=True)
 
+    # If running on Python 3.12 where bitsandbytes GPU wheels may be unavailable,
+    # gracefully disable 4bit quantization when bnb is missing.
+    if args.quantize_4bit:
+        try:
+            import bitsandbytes as _bnb  # noqa: F401
+            _bnb_available = True
+        except Exception:
+            _bnb_available = False
+        if not _bnb_available:
+            print("[WARN] bitsandbytes가 감지되지 않아 4bit 양자화를 비활성화합니다 (--quantize_4bit false 적용).")
+            args.quantize_4bit = False
+
     # Load dataset
     data_files = {
         "train": os.path.join(args.data_dir, args.train_file),
@@ -193,14 +206,14 @@ def main() -> None:
     # Model loading (4-bit QLoRA by default)
     load_kwargs: Dict[str, Any] = {"device_map": "auto"}
     if args.quantize_4bit:
-        load_kwargs.update(
-            dict(
-                load_in_4bit=True,
-                bnb_4bit_use_double_quant=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.bfloat16 if args.bf16 else torch.float16,
-            )
+        quant_dtype = torch.bfloat16 if args.bf16 else torch.float16
+        quant_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=quant_dtype,
         )
+        load_kwargs["quantization_config"] = quant_config
 
     model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path, **load_kwargs)
 
@@ -253,7 +266,6 @@ def main() -> None:
 
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
         peft_config=peft_config,
         args=training_args,
         train_dataset=dataset["train"],
