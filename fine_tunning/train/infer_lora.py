@@ -6,21 +6,32 @@ import argparse
 from typing import Optional
 
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
 
 def load_model(base_model: str, adapter_dir: str, bf16: bool = True, quantize_4bit: bool = True):
+    # Gracefully disable 4bit when bitsandbytes is not available (e.g., Python 3.12)
+    if quantize_4bit:
+        try:
+            import bitsandbytes as _bnb  # noqa: F401
+            _bnb_available = True
+        except Exception:
+            _bnb_available = False
+        if not _bnb_available:
+            print("[WARN] bitsandbytes가 감지되지 않아 4bit 양자화를 비활성화합니다 (--quantize_4bit false 적용).")
+            quantize_4bit = False
+
     load_kwargs = {"device_map": "auto"}
     if quantize_4bit:
-        load_kwargs.update(
-            dict(
-                load_in_4bit=True,
-                bnb_4bit_use_double_quant=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.bfloat16 if bf16 else torch.float16,
-            )
+        quant_dtype = torch.bfloat16 if bf16 else torch.float16
+        quant_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=quant_dtype,
         )
+        load_kwargs["quantization_config"] = quant_config
     model = AutoModelForCausalLM.from_pretrained(base_model, **load_kwargs)
     model = PeftModel.from_pretrained(model, adapter_dir)
     tokenizer = AutoTokenizer.from_pretrained(base_model, use_fast=True)
