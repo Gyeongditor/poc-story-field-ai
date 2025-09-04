@@ -88,9 +88,21 @@ def main():
     args = ap.parse_args()
 
     tok = AutoTokenizer.from_pretrained(args.base_model, use_fast=True)
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token  # pad 없으면 eos로 통일
+
     model = AutoModelForCausalLM.from_pretrained(args.base_model, device_map="auto", dtype=torch.bfloat16)
     model = PeftModel.from_pretrained(model, args.adapter, device_map="auto")
     model.eval()
+
+    # eos를 '정수 1개'로 강제 통일
+    eos_id = tok.eos_token_id
+    if isinstance(eos_id, list):
+        eos_id = eos_id[0]
+    if eos_id is None:
+        # 혹시 모를 안전장치
+        eos_id = tok.convert_tokens_to_ids(tok.eos_token) if tok.eos_token else tok.pad_token_id
+    assert isinstance(eos_id, int), f"eos_token_id must be int, got: {type(eos_id)}"
 
     # 실제 입력
     sample = {
@@ -112,7 +124,7 @@ def main():
     inputs = tok(prompt, return_tensors="pt").to(model.device)
 
     # 최소 생성 길이 보장
-    processors = LogitsProcessorList([MinLengthLogitsProcessor(args.min_new_tokens, tok.eos_token_id)])
+    processors = LogitsProcessorList([MinLengthLogitsProcessor(args.min_new_tokens, eos_id)])
 
     with torch.inference_mode():
         out = model.generate(
@@ -122,7 +134,8 @@ def main():
             top_p=args.top_p,
             top_k=args.top_k,
             max_new_tokens=args.max_new_tokens,
-            eos_token_id=tok.eos_token_id,
+            eos_token_id=eos_id,
+            pad_token_id=eos_id,  # pad도 같은 id로 통일(디바이스/마스킹 이슈 예방)
             repetition_penalty=args.repetition_penalty,
             no_repeat_ngram_size=args.no_repeat_ngram_size,
             bad_words_ids=bad_words_ids,
