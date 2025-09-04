@@ -1,7 +1,9 @@
 # scripts/infer.py
-import re, json, argparse
+import re
+import json
+import argparse
 from typing import List
-from transformers import AutoTokenizer, AutoModelForCausalLM, LogitsProcessorList, MinLengthLogitsProcessor
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 import torch
 
@@ -14,7 +16,7 @@ SYSTEM_PROMPT = (
     "### 1쪽\n(본문)\n\n### 2쪽\n(본문)\n\n### 3쪽\n(본문)\n\n### 4쪽\n(본문)\n\n### 5쪽\n(본문)\n"
 )
 
-# 고품질 one-shot 예시 (플레이스홀더/메타텍스트 없음)
+# --- one-shot 예시(형식/톤만 유도; 플레이스홀더/메타텍스트 없음) ---
 FEW_SHOT_USER = json.dumps({
     "character": "다람쥐", "age": 5, "sex": "여",
     "storyContent": "다람쥐가 가을 숲에서 도토리를 모으다가 길 잃은 무당벌레를 만납니다.",
@@ -47,7 +49,7 @@ def build_messages(user_json_str: str):
         {"role": "user", "content": user_json_str},
     ]
 
-# 앞 템플릿/예시를 건너뛰기 위해 "가장 마지막" ### 1쪽 을 기준으로 자름
+# "가장 마지막" ### 1쪽 이후만 추출 (템플릿/예시 오염 방지)
 PAGE1_RE = re.compile(r"(?:^|\n)###\s*1쪽\s*\n", re.MULTILINE)
 
 def extract_story(text: str) -> str:
@@ -56,13 +58,14 @@ def extract_story(text: str) -> str:
         return text.strip()
     start = matches[-1].start()
     story = text[start:].lstrip()
-    # user/assistant 등 메타라인 제거
+    # user/assistant 같은 메타라인 제거
     story = "\n".join([ln for ln in story.splitlines() if not re.match(r"^\s*(user|assistant)\s*$", ln, re.I)])
     return story
 
-# (옵션) 문장 분리/검증
+# --------- 문장 분리(lookbehind 없음, 캡처/재조립) ----------
 _END_TOKENS = r"[.!?。？！]|다\.|요\.|요\?|다\?"
 _SENT_SPLIT = re.compile(rf"({_END_TOKENS})\s+")
+
 def count_sents(par: str) -> int:
     parts = _SENT_SPLIT.split(par.strip())
     sents, i = [], 0
@@ -87,6 +90,7 @@ def main():
     ap.add_argument('--no_repeat_ngram_size', type=int, default=4)
     args = ap.parse_args()
 
+    # 토크나이저/모델 로드
     tok = AutoTokenizer.from_pretrained(args.base_model, use_fast=True)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token  # pad 없으면 eos로 통일
@@ -95,16 +99,15 @@ def main():
     model = PeftModel.from_pretrained(model, args.adapter, device_map="auto")
     model.eval()
 
-    # eos를 '정수 1개'로 강제 통일
+    # eos를 '정수 1개'로 강제
     eos_id = tok.eos_token_id
     if isinstance(eos_id, list):
         eos_id = eos_id[0]
     if eos_id is None:
-        # 혹시 모를 안전장치
         eos_id = tok.convert_tokens_to_ids(tok.eos_token) if tok.eos_token else tok.pad_token_id
     assert isinstance(eos_id, int), f"eos_token_id must be int, got: {type(eos_id)}"
 
-    # 실제 입력
+    # 실제 입력 (필요 시 argparse로 교체 가능)
     sample = {
       "character": "토끼",
       "age": 5,
@@ -117,14 +120,11 @@ def main():
     messages = build_messages(user_json)
     prompt = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
-    # 금지어 설정: 플레이스홀더/메타 출력 차단
+    # 금지어: 플레이스홀더/메타 문자열 차단
     bad_words = ["...문장...", "user", "assistant"]
     bad_words_ids = [tok(bw, add_special_tokens=False).input_ids for bw in bad_words]
 
     inputs = tok(prompt, return_tensors="pt").to(model.device)
-
-    # 최소 생성 길이 보장
-    processors = LogitsProcessorList([MinLengthLogitsProcessor(args.min_new_tokens, eos_id)])
 
     with torch.inference_mode():
         out = model.generate(
@@ -134,17 +134,17 @@ def main():
             top_p=args.top_p,
             top_k=args.top_k,
             max_new_tokens=args.max_new_tokens,
+            min_new_tokens=args.min_new_tokens,   # ✅ 공식 인자로 최소 길이 보장
             eos_token_id=eos_id,
-            pad_token_id=eos_id,  # pad도 같은 id로 통일(디바이스/마스킹 이슈 예방)
+            pad_token_id=eos_id,                  # pad/eos 통일(마스킹/디바이스 이슈 예방)
             repetition_penalty=args.repetition_penalty,
             no_repeat_ngram_size=args.no_repeat_ngram_size,
             bad_words_ids=bad_words_ids,
-            logits_processor=processors,
         )
     text = tok.decode(out[0], skip_special_tokens=True)
     story = extract_story(text)
 
-    # 간단 검증: 각 페이지 3+문장 유도(미달이면 경고만 출력; 강제 후처리는 제거)
+    # 간단 검증: 각 페이지 3+문장 권장 (경고만)
     pages = re.split(r"\n\s*###\s*\d쪽\s*\n", story)
     if len([p for p in pages if p.strip()]) < 5:
         print("[WARN] 5쪽 형식이 완전하지 않습니다. 프롬프트/하이퍼파라미터를 조정하세요.")
