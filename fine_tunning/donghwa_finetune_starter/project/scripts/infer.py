@@ -1,41 +1,42 @@
 # scripts/infer.py
 import re, json, argparse
 from typing import List
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, LogitsProcessorList, MinLengthLogitsProcessor
 from peft import PeftModel
 import torch
 
 SYSTEM_PROMPT = (
-    "너는 유아동 동화 작가야. 사용자의 JSON 입력(character, age, sex, storyContent, keyword)을 읽고, "
-    "한국어로 5쪽 동화를 작성해. 각 쪽은 3~4문장, 온화하고 따뜻한 분위기. "
-    "제목은 쓰지 말고 본문만. 꼭 아래 형식으로:\n"
-    "### 1쪽\n...문장...\n\n### 2쪽\n...문장...\n\n### 3쪽\n...문장...\n\n### 4쪽\n...문장...\n\n### 5쪽\n...문장...\n"
-    "반드시 새로운 내용을 전개하고, 같은 문장을 반복하지 마."
+    "너는 유아동 동화 작가야. 사용자의 JSON(character, age, sex, storyContent, keyword)을 바탕으로 "
+    "완전히 새로운 5쪽 동화를 한국어로 창작해. 각 쪽은 3~4문장. "
+    "따뜻하고 포근한 분위기(수채화처럼 부드러운 이미지를 떠올리게), "
+    "입력 문장을 그대로 복사하지 말고 새 디테일을 만들어. "
+    "출력은 반드시 아래 형식으로만:\n"
+    "### 1쪽\n(본문)\n\n### 2쪽\n(본문)\n\n### 3쪽\n(본문)\n\n### 4쪽\n(본문)\n\n### 5쪽\n(본문)\n"
 )
 
-# ----- one-shot 예시 -----
+# 고품질 one-shot 예시 (플레이스홀더/메타텍스트 없음)
 FEW_SHOT_USER = json.dumps({
-    "character": "강아지", "age": 4, "sex": "남",
-    "storyContent": "강아지가 공원을 산책하다가 길 잃은 새끼 고양이를 보살펴 줍니다.",
+    "character": "다람쥐", "age": 5, "sex": "여",
+    "storyContent": "다람쥐가 가을 숲에서 도토리를 모으다가 길 잃은 무당벌레를 만납니다.",
     "keyword": {"atmosphere": "따뜻한", "drawingStyle": "수채화"}
 }, ensure_ascii=False)
 
 FEW_SHOT_ASSIST = (
     "### 1쪽\n"
-    "강아지는 아침 햇살이 부드럽게 스며드는 공원을 걸었어요. 풀잎에는 맺힌 이슬이 반짝였지요. "
-    "그때 작은 울음소리가 들렸어요.\n\n"
+    "가을 햇살이 숲에 비치자 다람쥐의 꼬리도 금빛으로 반짝였어요. 바삭바삭 낙엽 소리를 들으며 도토리를 주웠지요. "
+    "그때 아주 작은 목소리가 귓가를 간질였어요.\n\n"
     "### 2쪽\n"
-    "나뭇가지 아래에서 새끼 고양이가 덜덜 떨고 있었어요. 강아지는 살금살금 다가가 조심스럽게 인사했지요. "
-    "고양이는 조그맣게 야옹 하고 대답했어요.\n\n"
+    "낙엽 사이에서 무당벌레 한 마리가 떨고 있었어요. 다람쥐는 조심스레 손바닥을 내밀어, 햇살이 드는 자리로 옮겨 주었지요. "
+    "무당벌레는 점박이 날개를 살짝 펴 보이며 고개를 끄덕였어요.\n\n"
     "### 3쪽\n"
-    "강아지는 자신의 스카프를 풀어 고양이를 포근하게 감싸 주었어요. 따뜻함이 전해지자 고양이의 눈빛이 조금 밝아졌지요. "
-    "둘은 함께 햇살이 드는 벤치로 갔어요.\n\n"
+    "둘은 함께 숲길을 걸으며 길 표식을 찾아보았어요. 도토리 향기와 나무의 숨결이 포근하게 감싸 안았지요. "
+    "다람쥐는 작은 잎배를 만들어 개울을 건너도록 도와주었어요.\n\n"
     "### 4쪽\n"
-    "벤치에서 강아지는 고양이에게 물을 나눠 주고, 지나가는 새에게 도움을 청했어요. "
-    "공원지기가 나타나 잃어버린 고양이를 찾고 있다는 소식을 전했지요.\n\n"
+    "노란 이파리 아래, 무당벌레의 집이 가까워졌어요. 길가의 버섯 우산들이 다리를 만들어 주는 듯 보였지요. "
+    "마침내 고목의 껍질 틈에서 반짝이는 무당벌레 가족의 집을 찾았어요.\n\n"
     "### 5쪽\n"
-    "곧 주인이 뛰어와 고양이를 안아 올렸어요. 강아지는 안도하며 꼬리를 흔들었지요. "
-    "따뜻한 인사가 오가고, 공원에는 다시 평온한 햇살이 번졌어요."
+    "무당벌레 가족은 기쁨의 점춤을 추며 인사했어요. 다람쥐의 마음도 따뜻하게 데워졌지요. "
+    "저녁 바람이 살짝 불어오자, 숲은 부드러운 수채화처럼 고요히 물들었어요."
 )
 
 def build_messages(user_json_str: str):
@@ -46,66 +47,44 @@ def build_messages(user_json_str: str):
         {"role": "user", "content": user_json_str},
     ]
 
-PAGE_HEADER_RE = re.compile(r"(?:^|\n)### 1쪽\s*\n", re.MULTILINE)
+# 앞 템플릿/예시를 건너뛰기 위해 "가장 마지막" ### 1쪽 을 기준으로 자름
+PAGE1_RE = re.compile(r"(?:^|\n)###\s*1쪽\s*\n", re.MULTILINE)
 
-def extract_story(generated_text: str) -> str:
-    m = PAGE_HEADER_RE.search(generated_text)
-    if not m:
-        return generated_text.strip()
-    start = m.start()
-    return generated_text[start:].lstrip()
+def extract_story(text: str) -> str:
+    matches = list(PAGE1_RE.finditer(text))
+    if not matches:
+        return text.strip()
+    start = matches[-1].start()
+    story = text[start:].lstrip()
+    # user/assistant 등 메타라인 제거
+    story = "\n".join([ln for ln in story.splitlines() if not re.match(r"^\s*(user|assistant)\s*$", ln, re.I)])
+    return story
 
-# --------- 문장 분리(lookbehind 없음) ----------
+# (옵션) 문장 분리/검증
 _END_TOKENS = r"[.!?。？！]|다\.|요\.|요\?|다\?"
-_SENT_SPLIT_REGEX = re.compile(rf"({_END_TOKENS})\s+")
-
-def _split_sentences(text: str) -> List[str]:
-    if not text:
-        return []
-    parts = _SENT_SPLIT_REGEX.split(text.strip())
-    sents = []
-    i = 0
+_SENT_SPLIT = re.compile(rf"({_END_TOKENS})\s+")
+def count_sents(par: str) -> int:
+    parts = _SENT_SPLIT.split(par.strip())
+    sents, i = [], 0
     while i < len(parts):
         chunk = (parts[i] or "").strip()
         sep = parts[i+1] if i+1 < len(parts) else ""
         if chunk:
             sents.append((chunk + (sep or "")).strip())
         i += 2
-    return [s for s in sents if s]
-
-def rebalance_pages(story: str) -> str:
-    pages = []
-    # "### n쪽" 헤더로 쪼개기
-    chunks = re.split(r"\n\s*###\s*\d쪽\s*\n", story)
-    chunks = [c for c in chunks if c.strip()]
-    for c in chunks[:5]:
-        sents = _split_sentences(c)
-        # 3~4문장으로 보정
-        if len(sents) < 3:
-            if sents:
-                sents[-1] = sents[-1] + " 작은 마음이 따뜻해졌어요."
-            while len(sents) < 3:
-                sents.append("이 순간 주인공은 한 번 더 주변을 살폈어요.")
-        elif len(sents) > 4:
-            sents = sents[:4]
-        pages.append(" ".join(sents))
-    while len(pages) < 5:
-        pages.append("조용한 숲속에 부드러운 바람이 스며들었어요. 모두의 얼굴에 미소가 번졌지요. 오늘도 따뜻한 하루였어요.")
-    out = []
-    for i, p in enumerate(pages, 1):
-        out.append(f"### {i}쪽\n{p}")
-    return "\n\n".join(out)
+    return len([s for s in sents if s])
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--base_model', type=str, default='Qwen/Qwen2.5-7B-Instruct')
     ap.add_argument('--adapter', type=str, default='outputs/adapter')
-    ap.add_argument('--temperature', type=float, default=0.9)
-    ap.add_argument('--top_p', type=float, default=0.95)
-    ap.add_argument('--max_new_tokens', type=int, default=600)
-    ap.add_argument('--repetition_penalty', type=float, default=1.15)
-    ap.add_argument('--no_repeat_ngram_size', type=int, default=3)
-    ap.add_argument('--postprocess', action='store_true')
+    ap.add_argument('--temperature', type=float, default=0.85)
+    ap.add_argument('--top_p', type=float, default=0.9)
+    ap.add_argument('--top_k', type=int, default=50)
+    ap.add_argument('--max_new_tokens', type=int, default=700)
+    ap.add_argument('--min_new_tokens', type=int, default=300)
+    ap.add_argument('--repetition_penalty', type=float, default=1.2)
+    ap.add_argument('--no_repeat_ngram_size', type=int, default=4)
     args = ap.parse_args()
 
     tok = AutoTokenizer.from_pretrained(args.base_model, use_fast=True)
@@ -113,7 +92,7 @@ def main():
     model = PeftModel.from_pretrained(model, args.adapter, device_map="auto")
     model.eval()
 
-    # 예시 입력 (원하시면 CLI 인자로 받아도 됩니다)
+    # 실제 입력
     sample = {
       "character": "토끼",
       "age": 5,
@@ -126,22 +105,41 @@ def main():
     messages = build_messages(user_json)
     prompt = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
+    # 금지어 설정: 플레이스홀더/메타 출력 차단
+    bad_words = ["...문장...", "user", "assistant"]
+    bad_words_ids = [tok(bw, add_special_tokens=False).input_ids for bw in bad_words]
+
     inputs = tok(prompt, return_tensors="pt").to(model.device)
+
+    # 최소 생성 길이 보장
+    processors = LogitsProcessorList([MinLengthLogitsProcessor(args.min_new_tokens, tok.eos_token_id)])
+
     with torch.inference_mode():
         out = model.generate(
             **inputs,
             do_sample=True,
             temperature=args.temperature,
             top_p=args.top_p,
+            top_k=args.top_k,
             max_new_tokens=args.max_new_tokens,
             eos_token_id=tok.eos_token_id,
             repetition_penalty=args.repetition_penalty,
             no_repeat_ngram_size=args.no_repeat_ngram_size,
+            bad_words_ids=bad_words_ids,
+            logits_processor=processors,
         )
     text = tok.decode(out[0], skip_special_tokens=True)
     story = extract_story(text)
-    if args.postprocess:
-        story = rebalance_pages(story)
+
+    # 간단 검증: 각 페이지 3+문장 유도(미달이면 경고만 출력; 강제 후처리는 제거)
+    pages = re.split(r"\n\s*###\s*\d쪽\s*\n", story)
+    if len([p for p in pages if p.strip()]) < 5:
+        print("[WARN] 5쪽 형식이 완전하지 않습니다. 프롬프트/하이퍼파라미터를 조정하세요.")
+    else:
+        for i, p in enumerate([x for x in pages if x.strip()][:5], 1):
+            if count_sents(p) < 3:
+                print(f"[WARN] {i}쪽 문장 수가 적습니다. temperature/top_p를 높이거나 min_new_tokens를 늘려보세요.")
+
     print(story)
 
 if __name__ == '__main__':
