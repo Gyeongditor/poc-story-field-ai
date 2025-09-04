@@ -17,7 +17,23 @@ KEY_MAP = {
     "pages": ["pages", "storyPages", "쪽", "page_list"],
 }
 
-SENT_SPLIT_PATTERN = re.compile(r"(?<=[.!?。？！]|\uB2E4\.|\uC694\.|\uC694\?|\uB2E4\?)\s+")
+END_TOKENS = r"[.!?。？！]|다\.|요\.|요\?|다\?"
+SENT_SPLIT_REGEX = re.compile(f"({END_TOKENS})\s+")
+
+def sentence_tokenize(text: str):
+    if not text:
+        return []
+    parts = SENT_SPLIT_REGEX.split(text.strip())
+    # parts 예: [문장조각, 구분자, 문장조각, 구분자, ... , 마지막조각(옵션)]
+    sents = []
+    i = 0
+    while i < len(parts):
+        chunk = parts[i].strip() if parts[i] else ""
+        sep = parts[i+1] if i+1 < len(parts) else ""
+        if chunk:
+            sents.append((chunk + (sep or "")).strip())
+        i += 2
+    return [s for s in sents if s]
 
 def first_key(d, candidates):
     for k in candidates:
@@ -49,8 +65,7 @@ def normalize_record(rec: dict):
 def split_to_pages(text: str, pages=TARGET_PAGES):
     if not text:
         return []
-    sents = SENT_SPLIT_PATTERN.split(text.strip())
-    sents = [s.strip() for s in sents if s.strip()]
+    sents = sentence_tokenize(text)
     if not sents:
         return []
     target_min, target_max = SENTS_PER_PAGE
