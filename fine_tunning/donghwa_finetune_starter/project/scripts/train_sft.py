@@ -1,4 +1,4 @@
-
+# scripts/train_sft.py
 import os, argparse
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
@@ -28,7 +28,7 @@ def main():
     ap.add_argument('--grad_accum', type=int, default=16)
     ap.add_argument('--epochs', type=int, default=3)
     ap.add_argument('--lr', type=float, default=2e-4)
-    ap.add_argument('--max_seq_len', type=int, default=2048)
+    ap.add_argument('--max_seq_len', type=int, default=2048)  # <- 그대로 인자로 받고 아래 토크나이즈에서만 사용
     args = ap.parse_args()
 
     bnb = get_bnb_config(args.use_qlora)
@@ -60,6 +60,7 @@ def main():
     ds_train = load_dataset('json', data_files=args.train_file, split='train')
     ds_val = load_dataset('json', data_files=args.val_file, split='train')
 
+    # --- 중요: 텍스트 길이 안전 가드(토큰 기준 잘라내기) ---
     def format_example(example):
         messages = example["messages"]
         text = tok.apply_chat_template(
@@ -67,7 +68,10 @@ def main():
             tokenize=False,
             add_generation_prompt=False,
         )
-        return {"text": text}
+        # 토큰 기준으로 잘라서 과도한 길이 방지
+        ids = tok(text, add_special_tokens=False, truncation=True, max_length=args.max_seq_len)["input_ids"]
+        trimmed = tok.decode(ids, skip_special_tokens=True)
+        return {"text": trimmed}
 
     ds_train = ds_train.map(format_example, remove_columns=ds_train.column_names)
     ds_val = ds_val.map(format_example, remove_columns=ds_val.column_names)
@@ -82,7 +86,7 @@ def main():
         save_steps=200,
         save_total_limit=3,
         bf16=True,
-        max_seq_length=args.max_seq_len,
+        # max_seq_length 파라미터 제거 (TRL 버전 호환)
         packing=True,
         lr_scheduler_type="cosine",
         warmup_ratio=0.03,
