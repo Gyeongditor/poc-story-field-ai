@@ -13,7 +13,7 @@ SYSTEM_PROMPT = (
     "반드시 새로운 내용을 전개하고, 같은 문장을 반복하지 마."
 )
 
-# ----- (선택) one-shot 예시로 형식/톤 유도 -----
+# ----- one-shot 예시 -----
 FEW_SHOT_USER = json.dumps({
     "character": "강아지", "age": 4, "sex": "남",
     "storyContent": "강아지가 공원을 산책하다가 길 잃은 새끼 고양이를 보살펴 줍니다.",
@@ -41,42 +41,47 @@ FEW_SHOT_ASSIST = (
 def build_messages(user_json_str: str):
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
-        # one-shot
         {"role": "user", "content": FEW_SHOT_USER},
         {"role": "assistant", "content": FEW_SHOT_ASSIST},
-        # actual input
         {"role": "user", "content": user_json_str},
     ]
 
 PAGE_HEADER_RE = re.compile(r"(?:^|\n)### 1쪽\s*\n", re.MULTILINE)
 
 def extract_story(generated_text: str) -> str:
-    """
-    프롬프트/메타 텍스트를 날리고, '줄 시작의 ### 1쪽' 이후만 반환.
-    """
     m = PAGE_HEADER_RE.search(generated_text)
     if not m:
         return generated_text.strip()
     start = m.start()
-    story = generated_text[start:].lstrip()
-    return story
+    return generated_text[start:].lstrip()
 
-# (선택) 후처리: 각 페이지 3~4문장으로 보정
-_SENT_SPLIT = re.compile(r"(?<=[.!?。？！]|다\.|요\.|요\?|다\?)\s+")
+# --------- 문장 분리(lookbehind 없음) ----------
+_END_TOKENS = r"[.!?。？！]|다\.|요\.|요\?|다\?"
+_SENT_SPLIT_REGEX = re.compile(rf"({_END_TOKENS})\s+")
+
 def _split_sentences(text: str) -> List[str]:
-    s = [t.strip() for t in _SENT_SPLIT.split(text.strip()) if t.strip()]
-    return s
+    if not text:
+        return []
+    parts = _SENT_SPLIT_REGEX.split(text.strip())
+    sents = []
+    i = 0
+    while i < len(parts):
+        chunk = (parts[i] or "").strip()
+        sep = parts[i+1] if i+1 < len(parts) else ""
+        if chunk:
+            sents.append((chunk + (sep or "")).strip())
+        i += 2
+    return [s for s in sents if s]
 
 def rebalance_pages(story: str) -> str:
     pages = []
+    # "### n쪽" 헤더로 쪼개기
     chunks = re.split(r"\n\s*###\s*\d쪽\s*\n", story)
-    # 첫 split은 빈 조각일 수 있으므로 제거
     chunks = [c for c in chunks if c.strip()]
     for c in chunks[:5]:
         sents = _split_sentences(c)
-        # 3~4문장 범위로 자르기/채우기
+        # 3~4문장으로 보정
         if len(sents) < 3:
-            # 간단 보정: 마지막 문장에 부가 정보 살짝 덧붙이기
             if sents:
                 sents[-1] = sents[-1] + " 작은 마음이 따뜻해졌어요."
             while len(sents) < 3:
@@ -84,11 +89,8 @@ def rebalance_pages(story: str) -> str:
         elif len(sents) > 4:
             sents = sents[:4]
         pages.append(" ".join(sents))
-
-    # 5쪽 맞추기
     while len(pages) < 5:
         pages.append("조용한 숲속에 부드러운 바람이 스며들었어요. 모두의 얼굴에 미소가 번졌지요. 오늘도 따뜻한 하루였어요.")
-
     out = []
     for i, p in enumerate(pages, 1):
         out.append(f"### {i}쪽\n{p}")
@@ -107,11 +109,11 @@ def main():
     args = ap.parse_args()
 
     tok = AutoTokenizer.from_pretrained(args.base_model, use_fast=True)
-    model = AutoModelForCausalLM.from_pretrained(args.base_model, device_map="auto", torch_dtype=torch.bfloat16)
+    model = AutoModelForCausalLM.from_pretrained(args.base_model, device_map="auto", dtype=torch.bfloat16)
     model = PeftModel.from_pretrained(model, args.adapter, device_map="auto")
     model.eval()
 
-    # 실제 입력 예시(원하시면 CLI에서 받아도 됩니다)
+    # 예시 입력 (원하시면 CLI 인자로 받아도 됩니다)
     sample = {
       "character": "토끼",
       "age": 5,
