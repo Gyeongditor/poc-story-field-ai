@@ -27,12 +27,20 @@ model = get_peft_model(model, lora_config)
 
 # 토크나이즈
 def preprocess(examples):
-    return tokenizer(
+    model_inputs = tokenizer(
         examples["input"],
-        text_target=examples["output"],
         max_length=1024,
         truncation=True
     )
+    labels = tokenizer(
+        examples["output"],
+        max_length=1024,
+        truncation=True
+    )["input_ids"]
+
+    model_inputs["labels"] = labels
+    return model_inputs
+
 
 tokenized = dataset.map(preprocess, batched=True)
 
