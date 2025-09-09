@@ -44,7 +44,8 @@ training_args = TrainingArguments(
     num_train_epochs=3,
     logging_steps=50,
     save_strategy="epoch",
-    evaluation_strategy="epoch",
+    #evaluation_strategy="epoch",
+    eval_steps=500,
     warmup_ratio=0.05,
     bf16=True
 )
