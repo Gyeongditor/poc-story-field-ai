@@ -1,6 +1,8 @@
 from datasets import load_dataset
-from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments, Trainer
+from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments, Trainer, DataCollatorForSeq2Seq
 from peft import LoraConfig, get_peft_model
+
+data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
 # 데이터셋 로드
 dataset = load_dataset("json", data_files={
@@ -54,7 +56,8 @@ trainer = Trainer(
     model=model,
     args=training_args,
     train_dataset=tokenized["train"],
-    eval_dataset=tokenized["validation"]
+    eval_dataset=tokenized["validation"],
+    data_collator=data_collator
 )
 
 if __name__ == "__main__":
