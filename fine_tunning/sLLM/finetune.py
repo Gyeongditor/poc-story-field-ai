@@ -2,7 +2,6 @@ from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments, Trainer, DataCollatorForSeq2Seq
 from peft import LoraConfig, get_peft_model
 
-data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
 # 데이터셋 로드
 dataset = load_dataset("json", data_files={
@@ -14,7 +13,7 @@ dataset = load_dataset("json", data_files={
 base_model = "Qwen/Qwen2.5-7B-Instruct"
 tokenizer = AutoTokenizer.from_pretrained(base_model)
 model = AutoModelForCausalLM.from_pretrained(base_model, device_map="auto")
-
+data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 # LoRA 설정
 lora_config = LoraConfig(
     r=16,
