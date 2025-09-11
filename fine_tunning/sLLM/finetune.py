@@ -4,7 +4,7 @@ from transformers import (
     AutoTokenizer,
     TrainingArguments,
     Trainer,
-    DataCollatorForLanguageModeling
+    DataCollatorForSeq2Seq
 )
 from peft import LoraConfig, get_peft_model
 
@@ -14,12 +14,12 @@ dataset = load_dataset("json", data_files={
     "validation": "processed/valid.jsonl"
 })
 
-# 2. 모델/토크나이저 로드
+# 2. 모델 / 토크나이저 불러오기
 base_model = "Qwen/Qwen2.5-7B-Instruct"
 tokenizer = AutoTokenizer.from_pretrained(base_model)
 model = AutoModelForCausalLM.from_pretrained(base_model, device_map="auto")
 
-# 3. LoRA 설정
+# 3. LoRA 설정 및 적용
 lora_config = LoraConfig(
     r=16,
     lora_alpha=32,
@@ -29,6 +29,11 @@ lora_config = LoraConfig(
     task_type="CAUSAL_LM"
 )
 model = get_peft_model(model, lora_config)
+
+# Gradient checkpointing & use_cache=False (필수)
+model.config.use_cache = False
+model.gradient_checkpointing_enable()
+model.print_trainable_parameters()  # 디버깅용 출력
 
 # 4. 전처리 함수
 def preprocess(examples):
@@ -41,10 +46,11 @@ def preprocess(examples):
 
 tokenized = dataset.map(preprocess, batched=True)
 
-# 5. 데이터 콜레이터 (padding + causal LM loss 자동 적용)
-data_collator = DataCollatorForLanguageModeling(
+# 5. Data collator (Causal LM 학습용)
+data_collator = DataCollatorForSeq2Seq(
     tokenizer=tokenizer,
-    mlm=False  # causal LM이므로 MLM 아님
+    model=model,
+    padding=True
 )
 
 # 6. 학습 파라미터
@@ -58,8 +64,8 @@ training_args = TrainingArguments(
     save_strategy="epoch",
     eval_steps=500,
     warmup_ratio=0.05,
-    bf16=True,   # GPU가 bf16 지원 (L4는 지원)
-    gradient_checkpointing=True  # 메모리 절약
+    bf16=True,  # L4 GPU는 bf16 지원
+    gradient_checkpointing=True
 )
 
 # 7. Trainer 정의
