@@ -43,19 +43,29 @@ def main():
     generator = pipeline("text-generation", model=model, tokenizer=tokenizer, device_map="auto")
 
     print("\n=== Generated Story ===\n")
+    # 일부 모델은 generation_config 방식만 허용. 경고 제거를 위해 기본 인자만 사용
     out = generator(
         prompt,
         max_new_tokens=args.max_tokens,
-        temperature=0.6,
-        top_p=0.9,
-        do_sample=False,
-        repetition_penalty=1.2,
     )
     story_text = out[0]["generated_text"][len(prompt):].strip()
     # [Page] 이전의 프리앰블, 요약/구분선 등이 나오면 제거
     first_page_idx = story_text.find("[Page ")
     if first_page_idx > 0:
         story_text = story_text[first_page_idx:]
+    elif not story_text.startswith("[Page "):
+        # [Page] 헤더가 전혀 없으면 문장 단위로 5문장씩 페이지 분할
+        # 간단한 한국어 문장 분할 (마침표/물음표/느낌표 기준)
+        import re as _re
+        sentences = [s.strip() for s in _re.split(r"(?<=[.!?])\s+", story_text) if s.strip()]
+        pages = []
+        for i in range(0, len(sentences), 5):
+            page_num = len(pages) + 1
+            chunk = sentences[i:i+5]
+            if not chunk:
+                continue
+            pages.append("[Page %d]\n%s" % (page_num, "\n".join(chunk)))
+        story_text = "\n".join(pages)
     # 한국어 이외 문자가 섞였을 경우 간단 필터링 (영문/중문 라인 제거)
     filtered_lines = []
     for line in story_text.splitlines():

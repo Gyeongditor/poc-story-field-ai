@@ -57,13 +57,10 @@ def main():
     )
 
     print("\n=== Generating Summary ===\n")
+    # 일부 모델은 인자 제한이 있으므로 기본 인자만 사용
     out = pipe(
         prompt,
         max_new_tokens=args.max_tokens,
-        temperature=0.6,       # 낮은 온도: 안정된 결과
-        top_p=0.9,
-        repetition_penalty=1.3,
-        do_sample=False
     )
 
     # 프롬프트 부분을 제거하고 생성된 결과만 저장
