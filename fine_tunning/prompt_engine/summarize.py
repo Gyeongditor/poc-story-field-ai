@@ -25,7 +25,14 @@ def main():
     pipe = pipeline("text-generation", model=model, tokenizer=tokenizer, device_map="auto")
 
     print("\n=== Generating Summary ===\n")
-    out = pipe(prompt, max_new_tokens=args.max_tokens, temperature=0.3, top_p=0.9)
+    out = pipe(
+        prompt,
+        max_new_tokens=400,         # 400~600 사이 권장
+        temperature=0.1,            # 낮게: 중복 완화
+        top_p=0.9,
+        repetition_penalty=1.2,     # <== 추가: 반복 방지
+        do_sample=False             # 샘플링 비활성: 요약 안정성↑
+        )
     summary_text = out[0]["generated_text"][len(prompt):].strip()
 
     with open(args.output_file, "w", encoding="utf-8") as f:
