@@ -37,15 +37,46 @@ model.config.use_cache = False
 model.gradient_checkpointing_enable()
 model.print_trainable_parameters()
 
-# 4. 전처리 함수 (input+output concat + input 부분 마스킹)
+# 4. 전처리 함수 (labels = input_ids 그대로, input 부분 -100 마스킹은 collator에서 처리)
 def preprocess(examples):
-    sources = [f"<|user|>\n{inp}\n<|assistant|>\n" for inp in examples["input"]]
-    targets = [t for t in examples["output"]]
-
-    model_inputs = tokenizer(
-        [s + t for s, t in zip(sources, targets)],
+    tokenized = tokenizer(
+        examples["text"],
         max_length=1024,
         truncation=True
     )
+    # 레이블은 입력 그대로 복사
+    tokenized["labels"] = tokenized["input_ids"].copy()
+    return tokenized
 
-    labels = []
+tokenized = dataset.map(preprocess, batched=True, remove_columns=dataset["train"].column_names)
+
+# 5. Data collator
+data_collator = default_data_collator
+
+# 6. 학습 파라미터
+training_args = TrainingArguments(
+    output_dir="./outputs",
+    per_device_train_batch_size=2,
+    per_device_eval_batch_size=2,
+    learning_rate=2e-4,
+    num_train_epochs=3,
+    logging_steps=50,
+    save_strategy="epoch",
+    eval_steps=500,
+    warmup_ratio=0.05,
+    bf16=True,
+    gradient_checkpointing=True
+)
+
+# 7. Trainer
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized["train"],
+    eval_dataset=tokenized["validation"],
+    data_collator=data_collator
+)
+
+# 8. 학습 시작
+if __name__ == "__main__":
+    trainer.train()

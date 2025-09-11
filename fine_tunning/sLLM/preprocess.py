@@ -66,8 +66,13 @@ def main():
         )
 
         output_text = split_story(text)
-        if output_text:
-            processed.append({"input": input_text, "output": output_text})
+        if not output_text:
+            continue
+
+        # Instruction 형식으로 합치기
+        merged_text = f"<|user|>\n{input_text}\n\n<|assistant|>\n{output_text}"
+
+        processed.append({"text": merged_text})
 
     # 학습/검증 분리
     train, valid = train_test_split(processed, test_size=0.1, random_state=42)
@@ -80,7 +85,7 @@ def main():
         for ex in valid:
             f.write(json.dumps(ex, ensure_ascii=False) + "\n")
 
-    print(f" 전처리 완료: {len(train)} train / {len(valid)} valid")
+    print(f"✅ 전처리 완료: {len(train)} train / {len(valid)} valid")
 
 if __name__ == "__main__":
     main()
