@@ -1,5 +1,6 @@
 import argparse
 import re
+import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 def load_template(path: str) -> str:
@@ -41,10 +42,11 @@ def main():
 
     # 모델 로드
     tokenizer = AutoTokenizer.from_pretrained(args.model_id)
+    preferred_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
     model = AutoModelForCausalLM.from_pretrained(
         args.model_id,
         device_map="auto",
-        torch_dtype="bfloat16"
+        torch_dtype=preferred_dtype
     )
 
     pipe = pipeline(
