@@ -39,7 +39,8 @@ def main():
 
     print("\n=== Generated Story ===\n")
     out = generator(prompt, max_new_tokens=args.max_tokens, temperature=0.8, top_p=0.9, do_sample=True)
-    print(out[0]["generated_text"])
+    story_text = out[0]["generated_text"][len(prompt):].strip()
+    print(story_text)
 
 if __name__ == "__main__":
     main()
