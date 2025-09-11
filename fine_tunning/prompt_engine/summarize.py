@@ -26,11 +26,10 @@ def main():
 
     print("\n=== Generating Summary ===\n")
     out = pipe(prompt, max_new_tokens=args.max_tokens, temperature=0.3, top_p=0.9)
-    summary_text = out[0]["generated_text"].strip()
+    summary_text = out[0]["generated_text"][len(prompt):].strip()
 
     with open(args.output_file, "w", encoding="utf-8") as f:
         f.write(summary_text)
-
     print(f"요약 결과가 {args.output_file} 에 저장되었습니다.")
 
 if __name__ == "__main__":
