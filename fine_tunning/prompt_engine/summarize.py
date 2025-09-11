@@ -46,7 +46,7 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         args.model_id,
         device_map="auto",
-        torch_dtype=preferred_dtype
+        dtype=preferred_dtype
     )
 
     pipe = pipeline(

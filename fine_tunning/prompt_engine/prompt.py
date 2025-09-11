@@ -38,13 +38,40 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         args.model_id,
         device_map="auto",
-        torch_dtype=preferred_dtype,
+        dtype=preferred_dtype,
     )
     generator = pipeline("text-generation", model=model, tokenizer=tokenizer, device_map="auto")
 
     print("\n=== Generated Story ===\n")
-    out = generator(prompt, max_new_tokens=args.max_tokens, temperature=0.8, top_p=0.9, do_sample=True)
+    out = generator(
+        prompt,
+        max_new_tokens=args.max_tokens,
+        temperature=0.6,
+        top_p=0.9,
+        do_sample=False,
+        repetition_penalty=1.2,
+    )
     story_text = out[0]["generated_text"][len(prompt):].strip()
+    # [Page] 이전의 프리앰블, 요약/구분선 등이 나오면 제거
+    first_page_idx = story_text.find("[Page ")
+    if first_page_idx > 0:
+        story_text = story_text[first_page_idx:]
+    # 한국어 이외 문자가 섞였을 경우 간단 필터링 (영문/중문 라인 제거)
+    filtered_lines = []
+    for line in story_text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            filtered_lines.append(stripped)
+            continue
+        # 페이지 헤더는 유지
+        if stripped.startswith("[Page "):
+            filtered_lines.append(stripped)
+            continue
+        # 한글 음절(가-힣) 비율이 낮은 라인은 제거
+        num_ko = sum(1 for ch in stripped if '가' <= ch <= '힣')
+        if num_ko >= max(1, len(stripped) // 3):
+            filtered_lines.append(stripped)
+    story_text = "\n".join(filtered_lines).strip()
     print(story_text)
     with open(args.output_file, "w", encoding="utf-8") as f:
         f.write(story_text)
