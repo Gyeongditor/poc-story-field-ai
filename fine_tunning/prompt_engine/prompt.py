@@ -49,39 +49,64 @@ def main():
         max_new_tokens=args.max_tokens,
     )
     story_text = out[0]["generated_text"][len(prompt):].strip()
-    # [Page] 이전의 프리앰블, 요약/구분선 등이 나오면 제거
+    # [Page] 이전의 프리앰블 제거
     first_page_idx = story_text.find("[Page ")
     if first_page_idx > 0:
         story_text = story_text[first_page_idx:]
-    elif not story_text.startswith("[Page "):
-        # [Page] 헤더가 전혀 없으면 문장 단위로 5문장씩 페이지 분할
-        # 간단한 한국어 문장 분할 (마침표/물음표/느낌표 기준)
-        import re as _re
+
+    import re as _re
+    # 1) [Page N]이 문장과 같은 줄에 붙은 경우 분리
+    story_text = _re.sub(r"\s*\[Page\s*(\d+)\]\s*", lambda m: f"\n[Page {m.group(1)}]\n", story_text)
+    story_text = story_text.strip()
+
+    # 2) 라인 정리 및 한국어 비율 필터
+    lines = [ln.strip() for ln in story_text.splitlines() if ln.strip()]
+    cleaned = []
+    for ln in lines:
+        if ln.startswith('[Page '):
+            cleaned.append(ln)
+            continue
+        num_ko = sum(1 for ch in ln if '가' <= ch <= '힣')
+        if num_ko >= max(1, len(ln) // 3):
+            cleaned.append(ln)
+
+    # 3) 페이지 구조 강제: [Page 1]~[Page 8], 각 5문장 이하로 수집
+    pages_map = {}
+    current = None
+    for ln in cleaned:
+        m = _re.match(r"^\[Page\s*(\d+)\]$", ln)
+        if m:
+            n = int(m.group(1))
+            if 1 <= n <= 8:
+                current = n
+                pages_map.setdefault(n, [])
+            else:
+                current = None
+            continue
+        if current is not None and len(pages_map[current]) < 5:
+            pages_map[current].append(ln)
+
+    # 4) [Page]가 전혀 없으면 5문장씩 자동 분할
+    if not pages_map:
         sentences = [s.strip() for s in _re.split(r"(?<=[.!?])\s+", story_text) if s.strip()]
-        pages = []
-        for i in range(0, len(sentences), 5):
-            page_num = len(pages) + 1
-            chunk = sentences[i:i+5]
-            if not chunk:
-                continue
-            pages.append("[Page %d]\n%s" % (page_num, "\n".join(chunk)))
-        story_text = "\n".join(pages)
-    # 한국어 이외 문자가 섞였을 경우 간단 필터링 (영문/중문 라인 제거)
-    filtered_lines = []
-    for line in story_text.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            filtered_lines.append(stripped)
+        page_num = 1
+        idx = 0
+        while idx < len(sentences) and page_num <= 8:
+            pages_map[page_num] = sentences[idx:idx+5]
+            idx += 5
+            page_num += 1
+
+    # 5) 페이지 조립 (최대 8페이지, 각 최대 5문장)
+    assembled = []
+    for n in sorted(pages_map.keys()):
+        if n < 1 or n > 8:
             continue
-        # 페이지 헤더는 유지
-        if stripped.startswith("[Page "):
-            filtered_lines.append(stripped)
+        if not pages_map[n]:
             continue
-        # 한글 음절(가-힣) 비율이 낮은 라인은 제거
-        num_ko = sum(1 for ch in stripped if '가' <= ch <= '힣')
-        if num_ko >= max(1, len(stripped) // 3):
-            filtered_lines.append(stripped)
-    story_text = "\n".join(filtered_lines).strip()
+        content = pages_map[n][:5]
+        assembled.append(f"[Page {n}]")
+        assembled.extend(content)
+    story_text = "\n".join(assembled).strip()
     print(story_text)
     with open(args.output_file, "w", encoding="utf-8") as f:
         f.write(story_text)
