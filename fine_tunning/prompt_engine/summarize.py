@@ -58,9 +58,9 @@ def main():
     out = pipe(
         prompt,
         max_new_tokens=args.max_tokens,
-        temperature=0.1,       # 낮은 온도: 안정된 결과
+        temperature=0.6,       # 낮은 온도: 안정된 결과
         top_p=0.9,
-        repetition_penalty=1.2,
+        repetition_penalty=1.3,
         do_sample=False
     )
 
