@@ -1,0 +1,12 @@
+torch>=2.1
+torchvision
+transformers>=4.44
+accelerate>=0.31
+diffusers[training]>=0.29
+datasets
+xformers
+bitsandbytes
+Pillow
+tqdm
+pandas
+googletrans==4.0.0-rc1
