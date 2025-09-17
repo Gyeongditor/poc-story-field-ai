@@ -5,7 +5,7 @@ accelerate>=0.31
 diffusers[training]>=0.29
 datasets
 xformers
-bitsandbytes
+# bitsandbytes  # Windows 환경 이슈시 주석 유지 또는 제거
 Pillow
 tqdm
 pandas
