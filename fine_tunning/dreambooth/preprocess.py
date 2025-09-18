@@ -1,12 +1,6 @@
-"""
-Style LoRA 전처리 (최신 개선)
-- raw_data 폴더 내 이미지(jpg/jpeg/png) + 동일 이름 json 메타 처리
-- 초대형 이미지(압축 폭탄) → 스킵
-- 이미 리사이즈된 PNG가 out_dir에 있으면 → 스킵
-"""
-
 import os, glob, json, argparse
-from PIL import Image, ImageOps, DecompressionBombError
+from PIL import Image, ImageOps
+from PIL.Image import DecompressionBombError
 from tqdm import tqdm
 
 RAW_DIR = "raw_data"
