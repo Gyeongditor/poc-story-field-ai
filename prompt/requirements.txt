@@ -1,0 +1,7 @@
+transformers==4.41.2
+torch>=2.0.0
+sentencepiece
+kss
+diffusers==0.30.0
+accelerate
+safetensors
