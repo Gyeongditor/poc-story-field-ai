@@ -5,3 +5,4 @@ kss
 diffusers==0.30.0
 accelerate
 safetensors
+git+https://github.com/ssut/py-hanspell.git
