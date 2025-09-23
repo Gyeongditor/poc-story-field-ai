@@ -25,7 +25,7 @@ def main():
 
     cmd = [
         "accelerate", "launch",
-        "train_dreambooth_lora_sdxl.py",  # diffusers/examples/dreambooth 에 있는 공식 스크립트
+        "diffusers/examples/dreambooth/train_dreambooth_lora_sdxl.py",  # diffusers/examples/dreambooth 에 있는 공식 스크립트
         f"--pretrained_model_name_or_path={MODEL}",
         f"--pretrained_vae_model_name_or_path={VAE}",
         f"--instance_data_dir={args.data_dir}",
