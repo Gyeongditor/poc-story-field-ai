@@ -38,7 +38,7 @@ def summarize_text(text: str) -> str:
     tokenizer = PreTrainedTokenizerFast.from_pretrained("gogamza/kobart-summarization")
     model = BartForConditionalGeneration.from_pretrained("gogamza/kobart-summarization")
 
-    # 🔑 프롬프트 보강
+    # 프롬프트 보강
     prompt = (
         "다음은 한 사람이 여러 여행 경험을 이야기한 기록입니다.\n"
         "핵심 장소, 활동, 여행 방식(단체/개인)을 중심으로 짧게 요약해 주세요.\n"
