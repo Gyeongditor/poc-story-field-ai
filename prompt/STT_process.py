@@ -3,22 +3,12 @@ import re
 import kss
 from transformers import PreTrainedTokenizerFast, BartForConditionalGeneration
 
-# ------------------------
-# 1) 규칙 기반 클린업
-# ------------------------
 def regex_clean(text: str) -> str:
-    # 추임새/불필요한 구어체 제거
     text = re.sub(r"(음+|네+|아+|그냥|뭐랄까)", "", text)
-    # 중복 단어 제거 (예: "여행 여행")
-    text = re.sub(r"\b(\w+)\s+\1\b", r"\1", text)
-    # 불필요 공백 제거
+    text = re.sub(r"\b(\w+)\s+\1\b", r"\1", text)  # 중복 단어 제거
     text = re.sub(r"\s{2,}", " ", text)
     return text.strip()
 
-
-# ------------------------
-# 2) 맞춤법 교정 (py-hanspell 기반)
-# ------------------------
 def grammar_correct(text: str) -> str:
     try:
         from hanspell import spell_checker
@@ -31,10 +21,16 @@ def grammar_correct(text: str) -> str:
         print(f"[경고] 맞춤법 교정 실패 → 원문 사용: {e}")
         return text
 
+def normalize_sentences(text: str) -> str:
+    sentences = kss.split_sentences(text)
+    normalized = []
+    for s in sentences:
+        s = s.replace("했는데요", "했습니다")
+        s = s.replace("갔는데요", "갔습니다")
+        s = s.replace("있었는데요", "있었습니다")
+        normalized.append(s)
+    return " ".join(normalized)
 
-# ------------------------
-# 3) 요약 (KoBART Summarization)
-# ------------------------
 def summarize_text(text: str) -> str:
     if not text.strip():
         return "요약할 내용이 없습니다."
@@ -42,23 +38,26 @@ def summarize_text(text: str) -> str:
     tokenizer = PreTrainedTokenizerFast.from_pretrained("gogamza/kobart-summarization")
     model = BartForConditionalGeneration.from_pretrained("gogamza/kobart-summarization")
 
-    inputs = tokenizer.encode(text, return_tensors="pt", max_length=1024, truncation=True)
+    # 🔑 프롬프트 보강
+    prompt = (
+        "다음은 한 사람이 여러 여행 경험을 이야기한 기록입니다.\n"
+        "핵심 장소, 활동, 여행 방식(단체/개인)을 중심으로 짧게 요약해 주세요.\n"
+        f"{text}\n\n요약:"
+    )
+
+    inputs = tokenizer.encode(prompt, return_tensors="pt", max_length=1024, truncation=True)
     if inputs.size()[-1] == 0:
         return "요약할 내용이 없습니다."
 
     summary_ids = model.generate(
         inputs,
-        max_length=200,
-        min_length=50,
+        max_length=250,
+        min_length=60,
         num_beams=4,
         no_repeat_ngram_size=2
     )
     return tokenizer.decode(summary_ids[0], skip_special_tokens=True)
 
-
-# ------------------------
-# 4) 전체 파이프라인
-# ------------------------
 def preprocess_pipeline(raw_text: str) -> str:
     print("[진행] Step1: 규칙 기반 클린업")
     step1 = regex_clean(raw_text)
@@ -70,15 +69,14 @@ def preprocess_pipeline(raw_text: str) -> str:
     if not step2.strip():
         step2 = step1
 
-    print("[진행] Step3: 요약 생성")
-    step3 = summarize_text(step2)
+    print("[진행] Step3: 문장 정규화")
+    step3 = normalize_sentences(step2)
 
-    return step3
+    print("[진행] Step4: 요약 생성")
+    step4 = summarize_text(step3)
 
+    return step4
 
-# ------------------------
-# 실행 진입점
-# ------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, help="STT 원본 텍스트 파일")
