@@ -47,7 +47,7 @@ def main():
     cmd.extend([
         f"--seed={args.seed}",
         "--checkpointing_steps=1000",
-        "--save_steps=1000",
+        #"--save_steps=1000",
     ])
     run(cmd)
 
